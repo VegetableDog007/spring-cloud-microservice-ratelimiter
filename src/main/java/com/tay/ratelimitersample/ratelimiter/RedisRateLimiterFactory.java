@@ -2,6 +2,7 @@ package com.tay.ratelimitersample.ratelimiter;
 
 import java.util.WeakHashMap;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -14,6 +15,7 @@ public class RedisRateLimiterFactory {
 	@Autowired
 	private JedisPool jedisPool;
 	private final WeakHashMap<String, RedisRateLimiter> limiterMap = new WeakHashMap<String, RedisRateLimiter>();
+	private ReentrantReadWriteLock lock = new ReentrantReadWriteLock();  
 	public JedisPool getJedisPool() {
 		return jedisPool;
 	}
@@ -23,15 +25,32 @@ public class RedisRateLimiterFactory {
 	}
 	
 	public RedisRateLimiter get(String keyPrefix, TimeUnit timeUnit, int permits) {
-		if(limiterMap.containsKey(keyPrefix)) {
-			return limiterMap.get(keyPrefix);
-		}
-		else {
-			synchronized(this) {
-				RedisRateLimiter redisRateLimiter = new RedisRateLimiter(jedisPool, timeUnit, permits);
-				limiterMap.put(keyPrefix, redisRateLimiter);
-				return redisRateLimiter;
+		RedisRateLimiter redisRateLimiter = null;
+		try {
+			lock.readLock().lock();
+			if(limiterMap.containsKey(keyPrefix)) {
+				redisRateLimiter = limiterMap.get(keyPrefix);
 			}
 		}
+		finally {
+			lock.readLock().unlock();  
+		}
+		
+		if(redisRateLimiter == null) {
+			try {
+				lock.writeLock().lock();
+				if(limiterMap.containsKey(keyPrefix)) {
+					redisRateLimiter = limiterMap.get(keyPrefix);
+				}
+				if(redisRateLimiter == null) {
+					redisRateLimiter = new RedisRateLimiter(jedisPool, timeUnit, permits);
+					limiterMap.put(keyPrefix, redisRateLimiter);
+				}
+			}
+			finally {
+				lock.writeLock().unlock();
+			}
+		}
+		return redisRateLimiter;
 	}
 }
