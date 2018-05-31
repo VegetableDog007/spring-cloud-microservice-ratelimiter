@@ -1,7 +1,6 @@
 package com.tay.ratelimitersample.ratelimiter;
 
 import java.lang.reflect.Method;
-import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import javax.servlet.http.HttpServletRequest;
@@ -13,9 +12,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
 import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.ModelAndView;
-
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
 
 @Component
 public class RateLimitCheckInterceptor implements HandlerInterceptor {
@@ -33,9 +29,6 @@ public class RateLimitCheckInterceptor implements HandlerInterceptor {
 	@Autowired
 	private RedisRateLimiterFactory redisRateLimiterFactory;
 	
-	@Autowired
-	private JedisPool jedisPool;
-
 	@Override
 	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
 			throws Exception {
@@ -66,9 +59,6 @@ public class RateLimitCheckInterceptor implements HandlerInterceptor {
 					RedisRateLimiter redisRatelimiter = redisRateLimiterFactory.get(rateLimiterKey, timeUnit,
 							permits);
 					isSuccess =	rateCheck(redisRatelimiter, rateLimiterKey, response);
-//					if(!isSuccess) {
-//						printFootprint(rateLimiterAnnotation, rateLimiterKey);
-//					}
 				}
 			} else if (rateLimiterAnnotation.base() == RateLimiter.Base.User) {
 				String userToken = getUserToken(request);
@@ -83,39 +73,7 @@ public class RateLimitCheckInterceptor implements HandlerInterceptor {
 		}
 		return isSuccess;
 	}
-//	/**
-//	 * 仅仅作为测试
-//	 * @param rateLimiter
-//	 * @param rateLimiterKey
-//	 */
-//	private void printFootprint(RateLimiter rateLimiter, String rateLimiterKey) {
-//		Jedis jedis = jedisPool.getResource();
-//		List<String> jedisTime = jedis.time();
-//		long currentSecond = Long.parseLong(jedisTime.get(0));
-//		long microSecondsElapseInCurrentSecond = Long.parseLong(jedisTime.get(1));
-//		long currentTimeInMicroSecond = currentSecond * 1000000 + microSecondsElapseInCurrentSecond;
-//		long previousSectionBeginScore = (currentTimeInMicroSecond - RedisRateLimiter.MICROSECONDS_IN_MINUTE);
-//		
-//		String[] sectionKeys = getKeyNames(jedis, rateLimiterKey);
-//		
-//		long previousSectionCount = jedis.zcount(sectionKeys[0], previousSectionBeginScore, Long.MAX_VALUE);
-//		long currentSectionCount = jedis.zcount(sectionKeys[1], Long.MIN_VALUE, Long.MAX_VALUE);
-//		
-//		System.out.println("currentTimeInMicroSecond : " + currentTimeInMicroSecond);
-//		System.out.println("previousSectionBeginScore: " + previousSectionBeginScore);
-//		System.out.println(sectionKeys[0] + " count: " + previousSectionCount);
-//		System.out.println(sectionKeys[1] + " count: " + currentSectionCount);
-//		System.out.println("latest minute total count: " + (previousSectionCount+currentSectionCount));
-//	}
-	
-//	private String[] getKeyNames(Jedis jedis, String keyPrefix) {
-//		String[] keyNames = null;
-//		long index = Long.parseLong(jedis.time().get(0)) / 60;
-//		String keyName1 = keyPrefix + ":" + (index - 1);
-//		String keyName2 = keyPrefix + ":" + index;
-//		keyNames = new String[] { keyName1, keyName2 };
-//		return keyNames;
-//	}
+
 	
 	
 	private boolean rateCheck(RedisRateLimiter redisRatelimiter, String keyPrefix, HttpServletResponse response)
